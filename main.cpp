@@ -22,10 +22,12 @@ int main(){
         dj_4
     };
 
-    Mat test_image = imread("../images/traffic_signs_6.jpg", IMREAD_COLOR);
+    Mat test_image = imread("../images/traffic_signs_2.jpg", IMREAD_COLOR);
     imshow("Original Image", test_image);
 
     image_channels_bgr bgr_channels = break_channels(test_image);
+    // image_channels_hsv hsv_channels = bgr_2_hsv(bgr_channels);
+    // display_hsv_channels(hsv_channels);
 
     Mat red_found = find_red_color(bgr_channels);
     red_found = closing(red_found, n8, 5);

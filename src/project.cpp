@@ -176,6 +176,24 @@ Mat region_filling(Mat source, neighborhood_structure neighborhood, Point start)
     return x_current;
 }
 
+Mat find_white_color(image_channels_bgr bgr_channels) {
+    Mat b = bgr_channels.B;
+    Mat g = bgr_channels.G;
+    Mat r = bgr_channels.R;
+    Mat result = Mat::ones(b.rows, b.cols, b.type()) * 255;
+
+    for (int i = 0; i < b.rows; i++) {
+        for (int j = 0; j < b.cols; j++) {
+            if (b.at<uchar>(i, j) > 200 && 
+                g.at<uchar>(i, j) > 200 && 
+                r.at<uchar>(i, j) > 200) {
+                result.at<uchar>(i, j) = 0;
+            }
+        }
+    }
+    return result;
+}
+
 Mat find_red_color(image_channels_bgr bgr_channels) {
     Mat b = bgr_channels.B;
     Mat g = bgr_channels.G;
@@ -431,8 +449,6 @@ vector<Point> approximate_polygon(vector<Point>& points, double epsilon) {
     return {start, end};
 }
 
-
-
 Mat find_shapes(Mat labels, Mat original_image, neighborhood_structure neighborhood, neighborhood_structure neighborhood2) {
     Mat original = original_image.clone();
     Mat result = Mat::ones(labels.size(), CV_8UC1) * 255;
@@ -511,12 +527,6 @@ Mat find_shapes(Mat labels, Mat original_image, neighborhood_structure neighborh
                 }
             }
 
-            // for(size_t i = 0; i < approx_curve.size(); i++) {
-            //     Point pt1 = approx_curve[i];
-            //     Point pt2 = approx_curve[(i + 1) % approx_curve.size()];
-            //     line(original, pt1, pt2, Scalar(0, 255, 0), 2);
-            // }
-
             if(is_valid_shape) {
                 line(original, Point(min_x, min_y), Point(max_x, min_y), PURPLE, 2);
                 line(original, Point(max_x, min_y), Point(max_x, max_y), PURPLE, 2);
@@ -527,5 +537,106 @@ Mat find_shapes(Mat labels, Mat original_image, neighborhood_structure neighborh
     }
     
     return original;
+}
+
+image_channels_hsv bgr_2_hsv(image_channels_bgr bgr_channels){
+    int rows = bgr_channels.B.rows;
+    int cols = bgr_channels.B.cols;
+
+    Mat H = Mat(rows, cols, CV_32FC1);
+    Mat S = Mat(rows, cols, CV_32FC1);
+    Mat V = Mat(rows, cols, CV_32FC1);
+
+    float r, g, b;
+    float M, m, C;
+    image_channels_hsv hsv_channels;
+
+    for (int i = 0; i < rows; i++) {
+        for (int j = 0; j < cols; j++) {
+            r = (float)bgr_channels.R.at<uchar>(i, j) / 255;
+            g = (float)bgr_channels.G.at<uchar>(i, j) / 255;
+            b = (float)bgr_channels.B.at<uchar>(i, j) / 255;
+
+            M = max(r, max(g, b));
+            m = min(r, min(g, b));
+            C = M - m;
+
+            V.at<float>(i, j) = M;
+            if (V.at<float>(i, j) != 0.0) {
+                S.at<float>(i, j) = C / V.at<float>(i, j);
+            } else {
+                S.at<float>(i, j) = 0.0;
+            }
+
+            if (C != 0.0) {
+                if (M == r) {
+                    H.at<float>(i, j) = 60 * (g - b) / C;
+                }
+                if (M == g) {
+                    H.at<float>(i, j) = 120 + 60 * (b - r) / C;
+                }
+                if (M == b) {
+                    H.at<float>(i, j) = 240 + 60 * (r - g) / C;
+                }
+            } else {
+                H.at<float>(i, j) = 0.0;
+            }
+            if (H.at<float>(i, j) < 0.0) {
+                H.at<float>(i, j) += 360;
+            }
+        }
+    }
+
+    hsv_channels.H = H;
+    hsv_channels.S = S;
+    hsv_channels.V = V;
+
+    return hsv_channels;
+}
+
+void display_hsv_channels(image_channels_hsv hsv_channels){
+    int rows = hsv_channels.H.rows;
+    int cols = hsv_channels.H.cols;
+    Mat H_norm, S_norm, V_norm;
+    Mat H, S, V;
+
+    H_norm = Mat(rows, cols, CV_8UC1);
+    S_norm = Mat(rows, cols, CV_8UC1);
+    V_norm = Mat(rows, cols, CV_8UC1);
+
+    H = hsv_channels.H;
+    S = hsv_channels.S;
+    V = hsv_channels.V;
+
+    for (int i = 0; i < rows; i++) {
+        for (int j = 0; j < cols; j++) {
+            H_norm.at<uchar>(i, j) = H.at<float>(i, j) * 255 / 360;
+            S_norm.at<uchar>(i, j) = S.at<float>(i, j) * 255;
+            V_norm.at<uchar>(i, j) = V.at<float>(i, j) * 255;
+        }
+    }
+
+    imshow("H", H_norm);
+    imshow("S", S_norm);
+    imshow("V", V_norm);
+}
+
+Mat detect_white_from_saturation(Mat saturation) {
+    Mat result = Mat::ones(saturation.rows, saturation.cols, CV_8UC1) * 255;
+    
+    // White regions have low saturation values
+    // We'll use a threshold to identify these regions
+    const float SATURATION_THRESHOLD = 0.3;  // Adjust this value based on your needs
+    
+    for (int i = 0; i < saturation.rows; i++) {
+        for (int j = 0; j < saturation.cols; j++) {
+            // If saturation is low, mark as white (black in result)
+            if (saturation.at<float>(i, j) < SATURATION_THRESHOLD) {
+                result.at<uchar>(i, j) = 0;
+            }
+        }
+    }
+    
+    return result;
 }
 
