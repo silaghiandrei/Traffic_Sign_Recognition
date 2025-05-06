@@ -184,8 +184,8 @@ Mat find_red_color(image_channels_bgr bgr_channels) {
 
     for (int i = 0; i < b.rows; i++) {
         for (int j = 0; j < b.cols; j++) {
-            if (0 < b.at<uchar>(i, j) && b.at<uchar>(i, j) < 128 &&
-                0 < g.at<uchar>(i, j) && g.at<uchar>(i, j) < 75 &&
+            if (0 < b.at<uchar>(i, j) && b.at<uchar>(i, j) < 132 &&
+                0 < g.at<uchar>(i, j) && g.at<uchar>(i, j) < 78 &&
                 105 < r.at<uchar>(i, j) && r.at<uchar>(i, j) < 255) {
                 result.at<uchar>(i, j) = 0;
             }
@@ -357,6 +357,82 @@ int compute_area(Mat source) {
     return area;
 }
 
+double point_to_line_distance(Point p, Point line_start, Point line_end) {
+    double p_x = p.x;
+    double p_y = p.y;
+    double start_x = line_start.x;
+    double start_y = line_start.y;
+    double end_x = line_end.x;
+    double end_y = line_end.y;
+
+    double vec1_x = p_x - start_x;
+    double vec1_y = p_y - start_y;
+    double vec2_x = end_x - start_x;
+    double vec2_y = end_y - start_y;
+
+    double dot_prod = vec1_x * vec2_x + vec1_y * vec2_y;
+    double sq_length = vec2_x * vec2_x + vec2_y * vec2_y;
+    double param = -1;
+
+    if (sq_length != 0) {
+        param = dot_prod / sq_length;
+    }
+
+    double proj_x, proj_y;
+
+    if (param < 0) {
+        proj_x = start_x;
+        proj_y = start_y;
+    } else if (param > 1) {
+        proj_x = end_x;
+        proj_y = end_y;
+    } else {
+        proj_x = start_x + param * vec2_x;
+        proj_y = start_y + param * vec2_y;
+    }
+
+    double dx = p_x - proj_x;
+    double dy = p_y - proj_y;
+
+    return sqrt(dx * dx + dy * dy);
+}
+
+vector<Point> approximate_polygon(vector<Point>& points, double epsilon) {
+    if (points.size() <= 2) {
+        return points;
+    }
+
+    double max_dist = 0;
+    int max_index = 0;
+    Point start = points.front();
+    Point end = points.back();
+
+    for (int i = 1; i < points.size() - 1; i++) {
+        double dist = point_to_line_distance(points[i], start, end);
+        if (dist > max_dist) {
+            max_dist = dist;
+            max_index = i;
+        }
+    }
+
+    if (max_dist > epsilon) {
+        vector first_half(points.begin(), points.begin() + max_index + 1);
+        vector second_half(points.begin() + max_index, points.end());
+        
+        vector<Point> rec1 = approximate_polygon(first_half, epsilon);
+        vector<Point> rec2 = approximate_polygon(second_half, epsilon);
+        
+        vector<Point> result;
+        result.insert(result.end(), rec1.begin(), rec1.end() - 1);
+        result.insert(result.end(), rec2.begin(), rec2.end());
+        return result;
+    }
+
+    return {start, end};
+}
+
+
+
 Mat find_shapes(Mat labels, Mat original_image, neighborhood_structure neighborhood, neighborhood_structure neighborhood2) {
     Mat original = original_image.clone();
     Mat result = Mat::ones(labels.size(), CV_8UC1) * 255;
@@ -397,11 +473,11 @@ Mat find_shapes(Mat labels, Mat original_image, neighborhood_structure neighborh
         if(P_0.x != -1) {
             contour_info contour = extract_contour(object_mask, P_0, neighborhood);
             
-            Mat contour_mask = Mat::ones(labels.size(), CV_8UC1) * 255;
-            for(Point point : contour.border) {
-                contour_mask.at<uchar>(point.y, point.x) = 0;
-            }
-
+            double perimeter = contour.border.size();
+            double epsilon = 0.04 * perimeter;
+            
+            vector<Point> approx_curve = approximate_polygon(contour.border, epsilon);
+            
             int min_x = cols, min_y = rows, max_x = 0, max_y = 0;
             for(Point point : contour.border) {
                 min_x = min(min_x, point.x);
@@ -411,31 +487,36 @@ Mat find_shapes(Mat labels, Mat original_image, neighborhood_structure neighborh
             }
             Point center((min_x + max_x) / 2, (min_y + max_y) / 2);
             
-            Mat filled = region_filling(contour_mask, neighborhood2, center);
-            
-            int perimeter = contour.border.size();
+            Mat filled = region_filling(object_mask, neighborhood2, center);
             int area = compute_area(filled);
-            float thinness_ratio = (4.0f * CV_PI * area) / (perimeter * perimeter);
-            
-            const float CIRCLE_THRESHOLD_MIN = 0.93f;
-            const float TRIANGLE_THRESHOLD_MIN = 0.55f;
-            const float TRIANGLE_THRESHOLD_MAX = 0.75f;
             
             bool is_valid_shape = false;
             const Scalar PURPLE = Scalar(255, 0, 255);
             
-            printf("Shape %d - Area: %d, Perimeter: %d, Ratio: %.3f\n",
-                   label, area, perimeter, thinness_ratio);
+            printf("Shape %d - Area: %d, Vertices: %d\n",
+                   label, area, (int)approx_curve.size());
             
-            if(thinness_ratio >= CIRCLE_THRESHOLD_MIN) {
-                printf("  -> Identified as CIRCLE\n");
-                is_valid_shape = true;
-            }
-            else if(thinness_ratio >= TRIANGLE_THRESHOLD_MIN && thinness_ratio <= TRIANGLE_THRESHOLD_MAX) {
+            if(approx_curve.size() == 3) {
                 printf("  -> Identified as TRIANGLE\n");
                 is_valid_shape = true;
+            } else if (approx_curve.size() == 4) {
+                printf("  -> Identified as RECTANGLE\n");
+                is_valid_shape = true;
             }
-            
+            else if(approx_curve.size() >= 8) {
+                double circularity = 4 * CV_PI * area / (perimeter * perimeter);
+                if(circularity > 0.7) {
+                    printf("  -> Identified as CIRCLE\n");
+                    is_valid_shape = true;
+                }
+            }
+
+            // for(size_t i = 0; i < approx_curve.size(); i++) {
+            //     Point pt1 = approx_curve[i];
+            //     Point pt2 = approx_curve[(i + 1) % approx_curve.size()];
+            //     line(original, pt1, pt2, Scalar(0, 255, 0), 2);
+            // }
+
             if(is_valid_shape) {
                 line(original, Point(min_x, min_y), Point(max_x, min_y), PURPLE, 2);
                 line(original, Point(max_x, min_y), Point(max_x, max_y), PURPLE, 2);

@@ -53,5 +53,5 @@ Point find_first_point(Mat source, int label);
 Mat find_shapes(Mat labels, Mat original_image, neighborhood_structure neighborhood, neighborhood_structure neighborhood2);
 int compute_area(Mat source);
 bool equal_mat(Mat A, Mat B);
-
+vector<Point> approximate_polygon(const vector<Point>& points, double epsilon);
 #endif
