@@ -623,14 +623,11 @@ void display_hsv_channels(image_channels_hsv hsv_channels){
 
 Mat detect_white_from_saturation(Mat saturation) {
     Mat result = Mat::ones(saturation.rows, saturation.cols, CV_8UC1) * 255;
-    
-    // White regions have low saturation values
-    // We'll use a threshold to identify these regions
-    const float SATURATION_THRESHOLD = 0.3;  // Adjust this value based on your needs
+
+    const float SATURATION_THRESHOLD = 0.3;
     
     for (int i = 0; i < saturation.rows; i++) {
         for (int j = 0; j < saturation.cols; j++) {
-            // If saturation is low, mark as white (black in result)
             if (saturation.at<float>(i, j) < SATURATION_THRESHOLD) {
                 result.at<uchar>(i, j) = 0;
             }
