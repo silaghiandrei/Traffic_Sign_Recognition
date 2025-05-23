@@ -22,12 +22,10 @@ int main(){
         dj_4
     };
 
-    Mat test_image = imread("../images/traffic_signs_2.jpg", IMREAD_COLOR);
+    Mat test_image = imread("../images/traffic_signs_23.jpg", IMREAD_COLOR);
     imshow("Original Image", test_image);
 
     image_channels_bgr bgr_channels = break_channels(test_image);
-    // image_channels_hsv hsv_channels = bgr_2_hsv(bgr_channels);
-    // display_hsv_channels(hsv_channels);
 
     Mat red_found = find_red_color(bgr_channels);
     red_found = closing(red_found, n8, 5);
@@ -38,6 +36,8 @@ int main(){
     blue_found = opening(blue_found, n8, 3);
 
     Mat colors_found = union_mat(red_found, blue_found);
+    imshow("Colors found", colors_found);
+
     Mat labeled_objects = two_pass_labeling(colors_found, n8);
     imshow("Labeled objects", labeled_objects);
 

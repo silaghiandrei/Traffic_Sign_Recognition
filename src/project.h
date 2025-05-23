@@ -46,6 +46,7 @@ Mat intersection_mat(Mat A, Mat B);
 Mat union_mat(Mat A, Mat B);
 Mat region_filling(Mat source, neighborhood_structure neighborhood, Point start);
 Mat find_red_color(image_channels_bgr bgr_channels);
+Mat find_red_color_hsv(image_channels_hsv hsv_channels);
 Mat find_blue_color(image_channels_bgr bgr_channels);
 Mat find_white_color(image_channels_bgr bgr_channels);
 image_channels_hsv bgr_2_hsv(image_channels_bgr bgr_channels);
@@ -59,4 +60,5 @@ Mat find_shapes(Mat labels, Mat original_image, neighborhood_structure neighborh
 int compute_area(Mat source);
 bool equal_mat(Mat A, Mat B);
 vector<Point> approximate_polygon(const vector<Point>& points, double epsilon);
+Mat enhance_brightness(Mat source, float alpha, float beta);
 #endif

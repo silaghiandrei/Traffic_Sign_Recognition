@@ -434,8 +434,8 @@ vector<Point> approximate_polygon(vector<Point>& points, double epsilon) {
     }
 
     if (max_dist > epsilon) {
-        vector first_half(points.begin(), points.begin() + max_index + 1);
-        vector second_half(points.begin() + max_index, points.end());
+        vector first_half(points.begin(), points.begin() + max_index);
+        vector second_half(points.begin() + max_index + 1, points.end());
         
         vector<Point> rec1 = approximate_polygon(first_half, epsilon);
         vector<Point> rec2 = approximate_polygon(second_half, epsilon);
@@ -479,6 +479,8 @@ Mat find_shapes(Mat labels, Mat original_image, neighborhood_structure neighborh
             }
         }
 
+        object_mask = closing(object_mask, neighborhood, 3);
+
         int area = compute_area(object_mask);
         if (area < MIN_THRESHOLD) {
             continue;
@@ -490,10 +492,10 @@ Mat find_shapes(Mat labels, Mat original_image, neighborhood_structure neighborh
             contour_info contour = extract_contour(object_mask, P_0, neighborhood);
             
             double perimeter = contour.border.size();
-            double epsilon = 0.04 * perimeter;
+            double epsilon = 0.035 * perimeter;
             
             vector<Point> approx_curve = approximate_polygon(contour.border, epsilon);
-            
+
             int min_x = cols, min_y = rows, max_x = 0, max_y = 0;
             for(Point point : contour.border) {
                 min_x = min(min_x, point.x);
@@ -507,7 +509,7 @@ Mat find_shapes(Mat labels, Mat original_image, neighborhood_structure neighborh
             int area = compute_area(filled);
             
             bool is_valid_shape = false;
-            const Scalar PURPLE = Scalar(255, 0, 255);
+            const Scalar PURPLE = Scalar(247, 110, 255);
             
             printf("Shape %d - Area: %d, Vertices: %d\n",
                    label, area, (int)approx_curve.size());
@@ -515,23 +517,23 @@ Mat find_shapes(Mat labels, Mat original_image, neighborhood_structure neighborh
             if(approx_curve.size() == 3) {
                 printf("  -> Identified as TRIANGLE\n");
                 is_valid_shape = true;
-            } else if (approx_curve.size() == 4) {
+            } else if (approx_curve.size() >= 4 && approx_curve.size() <= 7) {
                 printf("  -> Identified as RECTANGLE\n");
                 is_valid_shape = true;
             }
             else if(approx_curve.size() >= 8) {
                 double circularity = 4 * CV_PI * area / (perimeter * perimeter);
-                if(circularity > 0.7) {
+                if(circularity > 0.6) {
                     printf("  -> Identified as CIRCLE\n");
                     is_valid_shape = true;
                 }
             }
 
             if(is_valid_shape) {
-                line(original, Point(min_x, min_y), Point(max_x, min_y), PURPLE, 2);
-                line(original, Point(max_x, min_y), Point(max_x, max_y), PURPLE, 2);
-                line(original, Point(max_x, max_y), Point(min_x, max_y), PURPLE, 2);
-                line(original, Point(min_x, max_y), Point(min_x, min_y), PURPLE, 2);
+                line(original, Point(min_x, min_y), Point(max_x, min_y), PURPLE, 3);
+                line(original, Point(max_x, min_y), Point(max_x, max_y), PURPLE, 3);
+                line(original, Point(max_x, max_y), Point(min_x, max_y), PURPLE, 3);
+                line(original, Point(min_x, max_y), Point(min_x, min_y), PURPLE, 3);
             }
         }
     }
@@ -635,5 +637,49 @@ Mat detect_white_from_saturation(Mat saturation) {
     }
     
     return result;
+}
+
+Mat find_red_color_hsv(image_channels_hsv hsv_channels) {
+    Mat h = hsv_channels.H;
+    Mat s = hsv_channels.S;
+    Mat v = hsv_channels.V;
+    Mat result = Mat::ones(h.rows, h.cols, CV_8UC1) * 255;
+
+    for (int i = 0; i < h.rows; i++) {
+        for (int j = 0; j < h.cols; j++) {
+            float hue = h.at<float>(i, j);
+            float sat = s.at<float>(i, j);
+            float val = v.at<float>(i, j);
+
+            bool is_red_hue = (hue >= 0 && hue <= 40) || (hue >= 140 && hue <= 180);
+            bool is_vivid_red = is_red_hue && sat >= 0.5 && val >= 0.2 && val <= 0.9;
+
+            if (is_vivid_red) {
+                result.at<uchar>(i, j) = 0;
+            }
+        }
+    }
+    return result;
+}
+
+Mat enhance_brightness(Mat source, float alpha, float beta) {
+    Mat enhanced = source.clone();
+    
+    for(int i = 0; i < enhanced.rows; i++) {
+        for(int j = 0; j < enhanced.cols; j++) {
+            Vec3b& pixel = enhanced.at<Vec3b>(i, j);
+            
+            for(int c = 0; c < 3; c++) {
+                float new_value = alpha * pixel[c] + beta;
+                
+                if(new_value > 255) new_value = 255;
+                if(new_value < 0) new_value = 0;
+                
+                pixel[c] = (uchar)new_value;
+            }
+        }
+    }
+    
+    return enhanced;
 }
 
