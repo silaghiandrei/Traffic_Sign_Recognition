@@ -35,6 +35,12 @@ struct grayscale_mapping {
     int count_grayscale_values;
 };
 
+struct BoundingBox {
+    int min_x, min_y, max_x, max_y;
+    bool is_valid;
+    vector<Point> approx_curve;
+};
+
 image_channels_bgr break_channels(Mat source);
 bool IsInside(Mat img, int i, int j);
 Mat dilation(Mat source, neighborhood_structure neighborhood, int no_iter);
@@ -47,10 +53,9 @@ Mat union_mat(Mat A, Mat B);
 Mat region_filling(Mat source, neighborhood_structure neighborhood, Point start);
 Mat find_red_color(image_channels_bgr bgr_channels);
 Mat find_blue_color(image_channels_bgr bgr_channels);
-Mat find_white_color(image_channels_bgr bgr_channels);
 image_channels_hsv bgr_2_hsv(image_channels_bgr bgr_channels);
 void display_hsv_channels(image_channels_hsv hsv_channels);
-Mat detect_white_from_saturation(Mat saturation);
+Mat find_white_color(image_channels_hsv hsv_channels);
 bool is_white(Mat& image, int i, int j);
 Mat two_pass_labeling(Mat source, neighborhood_structure neighborhood);
 contour_info extract_contour(Mat source, Point P_0, neighborhood_structure neighborhood);
