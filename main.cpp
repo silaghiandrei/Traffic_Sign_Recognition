@@ -22,24 +22,33 @@ int main(){
         dj_4
     };
 
-    Mat test_image = imread("../images/traffic_signs_23.jpg", IMREAD_COLOR);
+    Mat test_image = imread("../images/traffic_signs_13.jpg", IMREAD_COLOR);
     imshow("Original Image", test_image);
 
     image_channels_bgr bgr_channels = break_channels(test_image);
+    image_channels_hsv hsv_channels = bgr_2_hsv(bgr_channels);
 
     Mat red_found = find_red_color(bgr_channels);
     red_found = closing(red_found, n8, 5);
     red_found = opening(red_found, n8, 3);
+    //imshow("Red found", red_found);
 
     Mat blue_found = find_blue_color(bgr_channels);
     blue_found = closing(blue_found, n8, 5);
     blue_found = opening(blue_found, n8, 3);
+    //imshow("Blue found", blue_found);
+
+    Mat white_found = find_white_color(hsv_channels);
+    white_found = opening(white_found, n8, 3);
+    white_found = closing(white_found, n8, 5);
+    //imshow("White found", white_found);
 
     Mat colors_found = union_mat(red_found, blue_found);
-    imshow("Colors found", colors_found);
+    colors_found = union_mat(colors_found, white_found);
+    //imshow("Colors found", colors_found);
 
     Mat labeled_objects = two_pass_labeling(colors_found, n8);
-    imshow("Labeled objects", labeled_objects);
+    //imshow("Labeled objects", labeled_objects);
 
     Mat shapes = find_shapes(labeled_objects, test_image, n8, n4);
     imshow("Shapes", shapes);
